@@ -1,0 +1,6 @@
+ccgo
+chaincode
+src/
+pkg/
+old/
+.idea/*

@@ -4,7 +4,6 @@ import (
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 	"testing"
 	"io/ioutil"
-	"strings"
 	"fmt"
 )
 
@@ -314,8 +313,17 @@ func TestMatching_InvMatch(t *testing.T) {
 	//FabricKey	Seller	Date	Ref	Buyer	PO #	SKU	Qty	Curr	Unit cost	Amount
 	//CN_AtlasUSA1354651A5686	A2	3-Jan	1354651	A6	A5686	654864	100	USD	200	20,000
 	item := queryInvoice(stub, "1354651","A5686")
-	if strings.Contains(item[0].State, "Ok") {
-		t.Errorf("Failed to Invoice should be in error unmatched state is %s", item[0].State)
+	unmatched := queryUnmatched(stub)
+
+	var found *Unmatched = nil
+	for idx:=0; idx < len(unmatched);idx+=1 {
+		if found == nil && unmatched[idx].RefID == item[0].RefID{
+			found = &unmatched[idx]
+		}
+	}
+
+	if found == nil {
+		t.Errorf("there was an error retrieving TC5", )
 	}
 }
 
@@ -342,9 +350,17 @@ func TestMatching_InvMismatchExternal(t *testing.T) {
 	//FabricKey	Seller	Date	Ref	Buyer	PO #	SKU	Qty	Curr	Unit cost	Amount
 	//CN_AtlasUSA1354651A5686	A2	3-Jan	1354651	A6	A5686	654864	100	USD	200	20,000
 	item := queryInvoice(stub, "4684","A69879")
+	unmatched := queryUnmatched(stub)
+	logger.Debugf("= %-v\n", unmatched)
+	var found *Unmatched = nil
+	for idx:=0; idx < len(unmatched);idx+=1 {
+		if found == nil && unmatched[idx].RefID == item[0].RefID{
+			found = &unmatched[idx]
+		}
+	}
 
-	if strings.Contains(item[0].State, "Ok") {
-		t.Errorf("Failed to Invoice should be in error state is %s", item[0].State)
+	if found == nil {
+		t.Errorf("there was an error retrieving TC5", )
 	}
 }
 func TestMatching_List_Unmatched(t *testing.T) {
@@ -355,7 +371,7 @@ func TestMatching_List_Unmatched(t *testing.T) {
 	//FabricKey	Seller	Date	Ref	Buyer	PO #	SKU	Qty	Curr	Unit cost	Amount
 	//CN_AtlasUSA1354651A5686	A2	3-Jan	1354651	A6	A5686	654864	100	USD	200	20,000
 	item := queryUnmatched(stub)
-	if len(item) != 2 {
-		t.Errorf("unmatched should return 2 items not %d", len(item))
+	if len(item) != 6 {
+		t.Errorf("unmatched should return 6 items not %d", len(item))
 	}
 }

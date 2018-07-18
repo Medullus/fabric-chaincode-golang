@@ -5,7 +5,7 @@ import (
 	pb "github.com/hyperledger/fabric/protos/peer"
 	"encoding/json"
 	"bytes"
-)
+	)
 
 //FabricKey	Seller	Date	Ref	Buyer	PO #	SKU	Qty	Curr	Unit cost	Amount
 type Invoice struct {
@@ -60,7 +60,7 @@ func (t *SimpleChaincode) addInvoices(stub shim.ChaincodeStubInterface, args []s
 
 		//logger.Debug("Invoice has pk: "+pk)
 
-		t.match_invoice(stub, pk, &v)
+		unmatched:= t.match_invoice(stub, pk, &v)
 
 		vBytes, err := json.Marshal(v)
 
@@ -70,23 +70,25 @@ func (t *SimpleChaincode) addInvoices(stub shim.ChaincodeStubInterface, args []s
 		}
 		stub.PutState(pk, vBytes)
 		//TODO
-		//indexName := "unmatched~cn~ref~po"
-		//colorNameIndexKey, err := stub.CreateCompositeKey(indexName, attr)
-		//if err != nil {
-		//	logger.Errorf("Failed to create composite key %s", err)
-		//	return shim.Error(err.Error())
-		//}
-		////  Save index entry to state. Only the key name is needed, no need to store a duplicate copy of the Marble.
-		////  Note - passing a 'nil' value will effectively delete the key from state, therefore we pass null character as value
-		//if ! strings.Contains(v.State,"Ok"){
-		//	//logger.Errorf("Unmatched: %s\n%s",indexName, attr)
-		//	value := []byte{0x00}
-		//	err = stub.PutState(colorNameIndexKey, value)
-		//	if err != nil {
-		//		logger.Errorf("Failed to create composite key %s", err)
-		//		return shim.Error(err.Error())
-		//	}
-		//}
+		indexName := "unmatched~cn~ref~po"
+		colorNameIndexKey, err := stub.CreateCompositeKey(indexName, attr)
+		if err != nil {
+			logger.Errorf("Failed to create composite key %s", err)
+			return shim.Error(err.Error())
+		}
+		//  Save index entry to state. Only the key name is needed, no need to store a duplicate copy of the Marble.
+		//  Note - passing a 'nil' value will effectively delete the key from state, therefore we pass null character as value
+		if unmatched!= nil {
+			//logger.Errorf("Unmatched: %s\n%s",indexName, attr)
+			//value := []byte{0x00}
+			vBytes, err := json.Marshal(unmatched)
+
+			err = stub.PutState(colorNameIndexKey, vBytes)
+			if err != nil {
+				logger.Errorf("Failed to create composite key %s", err)
+				return shim.Error(err.Error())
+			}
+		}
 
 
 	}

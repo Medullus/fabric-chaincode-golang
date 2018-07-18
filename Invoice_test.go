@@ -81,7 +81,7 @@ func TestInvoiceUpdate(t *testing.T) {
 	//}
 }
 
-func queryUnmatched(stub *shim.MockStub) []map[string]string {
+func queryUnmatched(stub *shim.MockStub) []Unmatched {
 	logger.Debugf("queryUnmatched")
 	defer logger.Debug("queryUnmatched out")
 
@@ -97,7 +97,7 @@ func queryUnmatched(stub *shim.MockStub) []map[string]string {
 	}
 
 	//logger.Debugf("Payload: %s", string(res.Payload))
-	item := make([]map[string]string, 0)
+	item := make([]Unmatched, 0)
 	err := json.Unmarshal(res.Payload, &item)
 	if err != nil {
 		logger.Errorf("Failed to unmarshal: %s", err)
@@ -110,7 +110,7 @@ func queryInvoice(stub *shim.MockStub, ref,ponum string) []Invoice {
 	logger.Debugf("queryInvoice: %s", ref+ponum)
 	defer logger.Debug("queryInvoice out")
 
-	res := stub.MockInvoke("1", [][]byte{[]byte("RetreiveInvoice"), []byte(ref),[]byte(ponum)})
+	res := stub.MockInvoke("1", [][]byte{[]byte(GET_INVOICES), []byte(ref),[]byte(ponum)})
 	if res.Status != shim.OK {
 		fmt.Printf("queryInvoice failed with %s",  string(res.Message))
 		return nil

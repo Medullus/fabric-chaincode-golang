@@ -298,6 +298,12 @@ func (t *SimpleChaincode) getUnmatched(stub shim.ChaincodeStubInterface, args []
 	logger.Debug("enter get unmatched")
 	defer logger.Debug("exited get unmatched")
 
+	if len(unmatchList) < 1{
+		var buffer bytes.Buffer
+		buffer.WriteString("[")
+		buffer.WriteString("]")
+		return shim.Success([]byte(buffer.Bytes()))
+	}
 	var buffer bytes.Buffer
 	buffer.WriteString("[")
 	for _,v :=range unmatchList{

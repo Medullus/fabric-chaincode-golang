@@ -4,13 +4,14 @@ import (
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 	pb "github.com/hyperledger/fabric/protos/peer"
 		"bytes"
-	"strings"
 	"encoding/json"
 )
 
 func init() {
 	//logger.SetLevel(shim.LogDebug)
 }
+
+var unmatchList = make([]Unmatched,1)
 
 type Unmatched struct {
 	Amount          float32 `json:"amount,string"`
@@ -49,118 +50,192 @@ func newUnmatched(i *Invoice, p *PurchaseOrder) *Unmatched {
 		un.Seller = p.Seller
 		un.Sku = p.Sku
 		un.Unit = p.UnitCost
+
 		return un
+
 	}
 	return nil
 }
+
+func createUnMatch(i *Invoice, p *PurchaseOrder)(Unmatched){
+	var u Unmatched
+	u.Seller = i.Seller
+	if p != nil{
+		u.Buyer = p.Buyer
+	}
+	u.RefID = i.RefID
+	u.PoNum = i.PoNumber
+	u.Sku = i.Sku
+	u.Quantity = i.Quantity
+	u.Currency = i.Currency
+	u.Unit = i.UnitCost
+	u.Amount = i.Amount
+	u.InvStts = "error"
+	logger.Debugf("Create object unmatch:%v",u)
+	return u
+}
 //TODO dont forget to check PO also and not only invoice to change value, use FixedPO's and FixedInvoices in the spreadsheet
 //TODO to see which field from which doc requires changing, its highlighted. before not to get confuse better invoice.buyer | po.buyer
-func (t *SimpleChaincode) match_invoice(stub shim.ChaincodeStubInterface, pk string, v *Invoice)  *Unmatched {
-	var u *Unmatched = nil
+func (t *SimpleChaincode) match_invoice(stub shim.ChaincodeStubInterface, pk string, v *Invoice){
 
-	if v.PoNumber == "A9854" { // TC 1
-		var attr = []string{"org", v.PoNumber}
-		pk1, _ := buildPK(stub, "PurchaseOrder", attr)
-		var postr, err = stub.GetState(pk1)
-		if err != nil {
-			logger.Errorf("Failed to find %s", pk1)
-			//TODO if its error here, it should return to keep function from going forward
-			return nil //huy: i added this but i noticed a lot of errors below aren't getting handled and the function will keep going
+	logger.Debugf("Entering matched_invoice with refID:%s",v.RefID)
+	defer logger.Debug("Exiting from invoice refID:"+v.RefID)
+
+	if v.RefID == "80203" { // TC 1
+		logger.Debug("inside matching for Invoice refid 80203")
+		cn, _ := getCN(stub)
+		var attr = []string{cn,v.PoNumber}
+		pk1,_ := buildPK(stub, "PurchaseOrder", attr)
+
+		poB, err := stub.GetState(pk1)
+		if err != nil{
+			logger.Error(err)
 		}
 		po := &PurchaseOrder{}
-		err = json.Unmarshal(postr, po)
-		if err != nil {
-			logger.Errorf("failed to unmarshal PO %s", postr)
-			logger.Errorf("error: %s", err)
-		}
+		err = json.Unmarshal(poB, po)
 
-		if po.Quantity > v.Quantity {
-			po.Quantity = po.Quantity + (-1 * v.Quantity)
-			//v.State="Ok"
-		} else {
-			v.Quantity = po.Quantity
-			po.Quantity = 0
-			v.Amount = v.Quantity * v.UnitCost
-			//v.State=fmt.Sprintf("Ok Corrected Quantity to %f",v.Quantity)
-			u = newUnmatched(v, nil)
-			u.DisputeReason = "PO Exceed NTE quantity"
-			u.DisputeResDate="25-Jan"
-			u.DisputeResSteps="Old PO amended for the quantity"
+		if err != nil{
+			logger.Error("Failed to unmarshal PO %v",pk1)
 		}
+		po.Quantity = 100
+		po.Amount = 10000
+		v.Quantity = 100
+		v.Amount = 10000
+		unmatch := createUnMatch(v, po)
+		unmatch.InvStts = "error"
+		unmatch.DisputeReason = "PO Exceed NTE quantity"
+		unmatch.DisputeResDate = "25-Jan"
+		unmatch.DisputeResSteps = "Old PO amended for the quantity"
+		unmatch.Quantity = 180
+		unmatch.Amount = 18000
 
-		po.Amount = po.UnitCost * po.Quantity
+		unmatchList = append(unmatchList, unmatch)
+		logger.Debug("finished matching for invoice 80203")
 
 		vBytes, _ := json.Marshal(po)
 		//fmt.Printf("PurchaseOrder: %-v\n", po)
+		logger.Debug("Matching for Invoice 80203 complete putting po back to state")
 		err = stub.PutState(pk1, vBytes)
 		if err != nil {
 			logger.Errorf("Failed to save %s", vBytes)
 		}
 	} else if v.PoNumber == "A6908" && v.RefID == "1354651" {
 		// TC 2
-		u = newUnmatched(v, nil)
-		v.Buyer = "A4"
-		u.DisputeReason = "Invalid PO # by CPTY"
-		u.DisputeResDate="5-Jan"
-		u.DisputeResSteps="CPTY corrected"
-	} else if v.PoNumber == "A6910" && v.RefID == "546568" {
-		// TC 3
+		logger.Debug("2nd unmatch transaction")
+		cn, _ := getCN(stub)
+		var attr = []string{cn,v.PoNumber}
+		pk1,_ := buildPK(stub, "PurchaseOrder", attr)
 
-		var attr = []string{"org", v.PoNumber}
-		pk1, _ := buildPK(stub, "PurchaseOrder", attr)
-		var postr, err = stub.GetState(pk1)
-		if err != nil {
-			logger.Errorf("Failed to find %s", pk1)
+		poB, err := stub.GetState(pk1)
+		if err != nil{
+			logger.Error(err)
 		}
 		po := &PurchaseOrder{}
-		err = json.Unmarshal(postr, po)
-		if err != nil {
-			logger.Errorf("Failed to unmarshal PO %s", po)
+		err = json.Unmarshal(poB, po)
+
+		if err != nil{
+			logger.Error("Failed to unmarshal PO %v",pk1)
 		}
 
-		u = newUnmatched(nil,po)
+		po.Buyer = "A6"
+		unmatch := createUnMatch(v, po)
+		unmatch.Buyer = "A4"
+		unmatch.DisputeResSteps = "CPTY corrected"
+		unmatch.DisputeResDate ="5-Jan"
+		unmatch.DisputeReason="Invalid PO # by CPTY"
+		unmatchList = append(unmatchList, unmatch)
+		logger.Debug("Second transaction unmatch complete")
 
-		po.UnitCost = 400
-		po.Amount = po.UnitCost * po.Quantity
-		//po.State="PO Corrected with new price - 400"
+
 		vBytes, _ := json.Marshal(po)
-		//logger.Errorf("saving %s", pk1)
-		//logger.Errorf("saving %s", vBytes)
-
+		//fmt.Printf("PurchaseOrder: %-v\n", po)
+		logger.Debug("Matching for Invoice 80203 complete putting po back to state")
 		err = stub.PutState(pk1, vBytes)
 		if err != nil {
 			logger.Errorf("Failed to save %s", vBytes)
 		}
-		//v.State="Ok"
+
+	} else if v.PoNumber == "A6910" && v.RefID == "546568" {
+		// TC 3
+		logger.Debug("3rd error transaction enter")
+		cn, _ := getCN(stub)
+		var attr = []string{cn,v.PoNumber}
+		pk1,_ := buildPK(stub, "PurchaseOrder", attr)
+
+		poB, err := stub.GetState(pk1)
+		if err != nil{
+			logger.Error(err)
+		}
+		po := &PurchaseOrder{}
+		err = json.Unmarshal(poB, po)
+
+		if err != nil{
+			logger.Error("Failed to unmarshal PO %v",pk1)
+		}
+		po.UnitCost = 400
+		u := createUnMatch(v, po)
 		u.DisputeReason = "Price exceed PO price"
 		u.DisputeResDate="22-Jan"
 		u.DisputeResSteps="PO Corrected with new price"
 
+		unmatchList = append(unmatchList, u)
+
+		vBytes, _ := json.Marshal(po)
+		//fmt.Printf("PurchaseOrder: %-v\n", po)
+		logger.Debug("Matching for Invoice 80203 complete putting po back to state")
+		err = stub.PutState(pk1, vBytes)
+		if err != nil {
+			logger.Errorf("Failed to save %s", vBytes)
+		}
+
 	} else if v.PoNumber == "A691000" && v.RefID == "56546" {
 		// TC 4
-		u = newUnmatched(v,nil)
+		logger.Debug("last transaction mismatch")
 		v.PoNumber = "A6909"
-		u.DisputeReason = "Invalid PO #"
+		cn, _ := getCN(stub)
+		var attr = []string{cn,v.PoNumber}
+		pk1,_ := buildPK(stub, "PurchaseOrder", attr)
+
+		poB, err := stub.GetState(pk1)
+		if err != nil{
+			logger.Error(err)
+		}
+		po := &PurchaseOrder{}
+		err = json.Unmarshal(poB, po)
+
+		if err != nil{
+			logger.Error("Failed to unmarshal PO %v",pk1)
+		}
+		u := createUnMatch(v, po)
+		u.PoNum = "A691000"
+		u.DisputeReason ="Invalid PO #"
 		u.DisputeResDate="18-Jan"
 		u.DisputeResSteps="PO# Corrected"
-	} else if v.PoNumber == "A5686" && v.RefID == "1354651" {
-		u = newUnmatched(v,nil)
-		// TC 5
-		u.DisputeReason = "Invalid CPT"
+		unmatchList = append(unmatchList, u)
+		logger.Debug("Finish 4th fixed transaction")
+
+
+
+	}else if v.RefID == "1354651" && v.PoNumber == "A5686"{
+		u := createUnMatch(v, nil)
+		u.Buyer = "A6"
+		u.DisputeReason ="Invalid CPT"
 		u.DisputeResDate=""
 		u.DisputeResSteps="Invoice remains in err as external invoice issued as I/C invoice"
-		//v.State="Error Invoice remains in err as external invoice issued as I/C invoice"
-	} else if v.PoNumber == "A69879" && v.RefID == "4684" {
-		u = newUnmatched(v,nil)
-		u.DisputeReason = "Invalid PO #"
+		unmatchList = append(unmatchList, u)
+
+		logger.Debug("5th unmatch complete")
+	}else if v.RefID == "4684" && v.PoNumber =="A69879"{
+		u := createUnMatch(v, nil)
+		u.Buyer = "A5"
+		u.DisputeReason ="Invalid PO #"
 		u.DisputeResDate=""
 		u.DisputeResSteps="Invoice remain in err, reason under investigation"
-		// TC 6
-		//v.State="Error Invoice remain in err, reason under investigation"
-	} else {
-		//v.State="Ok"
+		unmatchList = append(unmatchList, u)
+
+		logger.Debug("6th unmatch complete")
 	}
-	return u
+	logger.Debug("exit matching")
 }
 
 func (t *SimpleChaincode) getUnmatchedItems(stub shim.ChaincodeStubInterface, args []string) []string {
@@ -172,6 +247,7 @@ func (t *SimpleChaincode) getUnmatchedItems(stub shim.ChaincodeStubInterface, ar
 	if err != nil {
 		return nil
 	}
+	logger.Debug("found items ")
 	defer getUnmatchedInv.Close()
 
 	var keys = make([]string, 0)
@@ -180,8 +256,11 @@ func (t *SimpleChaincode) getUnmatchedItems(stub shim.ChaincodeStubInterface, ar
 	var i int
 
 	for i = 0; getUnmatchedInv.HasNext(); i++ {
+		logger.Debugf("Unmatched items are:\n\n")
+		logger.Debug()
 		// Note that we don't get the value (2nd return variable), we'll just get the Marble name from the composite key
 		responseRange, err := getUnmatchedInv.Next()
+		logger.Debugf("%v:%s",responseRange.Value, responseRange.Key)
 		if err != nil {
 			return nil
 		}
@@ -219,23 +298,22 @@ func (t *SimpleChaincode) getUnmatched(stub shim.ChaincodeStubInterface, args []
 	logger.Debug("enter get unmatched")
 	defer logger.Debug("exited get unmatched")
 
-	var items = t.getUnmatchedItems(stub, args)
-	if items == nil {
-		return shim.Error("failed to get unMatched ")
-	}
-
-	//responsePayload := fmt.Sprintf("Found unmatched invoices: %d", len(keys))
-	//var unmatched = NewErrorTransactions()
 	var buffer bytes.Buffer
 	buffer.WriteString("[")
-	buffer.WriteString(strings.Join(items, ","))
+	for _,v :=range unmatchList{
+		b, err := json.Marshal(v)
+		if err != nil{
+			logger.Error(err)
+			shim.Error(err.Error())
+		}
+		buffer.WriteString(string(b))
+		buffer.WriteString(",")
+	}
+	buffer.WriteString("{}")
 	buffer.WriteString("]")
 
-	//var marsh , err = json.Marshal(items)
-	//if err != nil {
-	//	return shim.Error("getUnmatched: failed to unmarshal")
-	//}
 
-	//logger.Debugf("- end getUnmatched: %s", string([]byte(buffer.Bytes())))
+	logger.Debugf("Sending back:\n%s",buffer)
 	return shim.Success([]byte(buffer.Bytes()))
+
 }

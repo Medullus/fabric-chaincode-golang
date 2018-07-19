@@ -49,7 +49,7 @@ func (t *SimpleChaincode) initPurchaseOrders(stub shim.ChaincodeStubInterface, a
 
 	err := json.Unmarshal([]byte(args[0]), &items)
 	if err != nil {
-		logger.Error("Error unmarshing invoice json:", err)
+		logger.Error("Error unmarshing po json:", err)
 		return shim.Error(err.Error())
 	}
 

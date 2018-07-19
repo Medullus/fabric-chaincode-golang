@@ -11,7 +11,7 @@ func init() {
 	//logger.SetLevel(shim.LogDebug)
 }
 
-var unmatchList = make([]Unmatched,1)
+var unmatchList = make([]Unmatched,0)
 
 type Unmatched struct {
 	Amount          float32 `json:"amount,string"`
@@ -309,7 +309,7 @@ func (t *SimpleChaincode) getUnmatched(stub shim.ChaincodeStubInterface, args []
 		buffer.WriteString(string(b))
 		buffer.WriteString(",")
 	}
-	buffer.WriteString("{}")
+	buffer.Truncate(buffer.Len()-1)
 	buffer.WriteString("]")
 
 

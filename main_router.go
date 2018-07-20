@@ -26,6 +26,7 @@ const (
 
 	// Unmatched
 	GET_UNMATCHED = "GetUnmatched" // ()
+	DELETE_UNMATCHED = "DeleteUnmatched"
 
 	//Documents
 
@@ -102,6 +103,8 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 	// Unmatched Ops
 	if function == GET_UNMATCHED {
 		return t.getUnmatched(stub, args)
+	}else if function == DELETE_UNMATCHED{
+		return t.deleteUnmatch()
 	}
 
 	fmt.Println("invoke did not find func: " + function) //error

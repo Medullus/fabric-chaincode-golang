@@ -323,3 +323,11 @@ func (t *SimpleChaincode) getUnmatched(stub shim.ChaincodeStubInterface, args []
 	return shim.Success([]byte(buffer.Bytes()))
 
 }
+
+func (t *SimpleChaincode) deleteUnmatch() pb.Response{
+	logger.Debug("Deleting unmatched slice")
+	defer logger.Debug("Exited deleting unmatched slice")
+
+	unmatchList = nil
+	return shim.Success(nil)
+}
